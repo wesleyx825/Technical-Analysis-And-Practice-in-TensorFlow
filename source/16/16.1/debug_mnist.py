@@ -1,9 +1,9 @@
 # 贡献者：{吴翔 QQ：99456786}
 # tensorflow版本基于0.12
 # 源代码出处：tensorflow/python/debug/examples/debug_mnist.py，具体路径可查询 tensorflow.__path__
-# 37,133,134行为Tensorflow Debugger所增加的代码
-# 115行为bug，116行为debug的结果
-
+# 40,130,131行为Tensorflow Debugger所增加的代码
+# 112行为bug，113行为debug的结果
+# mnist数据集默认路径："/tmp/mnist_data"
 
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 #
@@ -31,34 +31,31 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import argparse
+import sys
+
 import tensorflow as tf
 
 from tensorflow.examples.tutorials.mnist import input_data
 from tensorflow.python import debug as tf_debug
 
-flags = tf.app.flags
-FLAGS = flags.FLAGS
-flags.DEFINE_integer("max_steps", 10, "Number of steps to run trainer.")
-flags.DEFINE_integer("train_batch_size", 100,
-                     "Batch size used during training.")
-flags.DEFINE_float("learning_rate", 0.025, "Initial learning rate.")
-flags.DEFINE_string("data_dir", "D:\\anaconda\\example\\tensorflow\\Data_sets\\MNIST_data", "Directory for storing data")
-flags.DEFINE_boolean("debug", False,
-                     "Use debugger to track down bad values during training")
 
 IMAGE_SIZE = 28
 HIDDEN_SIZE = 500
-NUM_LABELS = 10
+NUM_LABELS =10
 RAND_SEED = 42
 
 
 def main(_):
   # Import data
-  mnist = input_data.read_data_sets(FLAGS.data_dir, one_hot=True)
+  mnist = input_data.read_data_sets(FLAGS.data_dir,
+                                    one_hot=True,
+                                    fake_data=FLAGS.fake_data)
 
   def feed_dict(train):
-    if train:
-      xs, ys = mnist.train.next_batch(FLAGS.train_batch_size, fake_data=False)
+    if train or FLAGS.fake_data:
+      xs, ys = mnist.train.next_batch(FLAGS.train_batch_size,
+                                      fake_data=FLAGS.fake_data)
     else:
       xs, ys = mnist.test.images, mnist.test.labels
 
@@ -130,7 +127,7 @@ def main(_):
   sess.run(tf.global_variables_initializer())
 
   if FLAGS.debug:
-    sess = tf_debug.LocalCLIDebugWrapperSession(sess)
+    sess = tf_debug.LocalCLIDebugWrapperSession(sess, ui_type=FLAGS.ui_type)
     sess.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
 
   # Add this point, sess is a debug wrapper around the actual Session if
@@ -143,4 +140,46 @@ def main(_):
 
 
 if __name__ == "__main__":
-  tf.app.run()
+  parser = argparse.ArgumentParser()
+  parser.register("type", "bool", lambda v: v.lower() == "true")
+  parser.add_argument(
+      "--max_steps",
+      type=int,
+      default=10,
+      help="Number of steps to run trainer.")
+  parser.add_argument(
+      "--train_batch_size",
+      type=int,
+      default=100,
+      help="Batch size used during training.")
+  parser.add_argument(
+      "--learning_rate",
+      type=float,
+      default=0.025,
+      help="Initial learning rate.")
+  parser.add_argument(
+      "--data_dir",
+      type=str,
+      default="/tmp/mnist_data",
+      help="Directory for storing data")
+  parser.add_argument(
+      "--ui_type",
+      type=str,
+      default="curses",
+      help="Command-line user interface type (curses | readline)")
+  parser.add_argument(
+      "--fake_data",
+      type="bool",
+      nargs="?",
+      const=True,
+      default=False,
+      help="Use fake MNIST data for unit testing")
+  parser.add_argument(
+      "--debug",
+      type="bool",
+      nargs="?",
+      const=True,
+      default=False,
+      help="Use debugger to track down bad values during training")
+  FLAGS, unparsed = parser.parse_known_args()
+  tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
